@@ -32,7 +32,7 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
       state.procs.find(name == _._2.job.name) match {
         case Some(_) =>
           val errMsg = s"Runner with same name already monitored: " + name
-          val err = Error(Error.SOURCE_ALREADY_MONITORED, errMsg)
+          val err = Error(Error.ALREADY_MONITORED, errMsg)
           logger.error(errMsg)
           subscribers.foreach(_ ! err)
         case None =>
@@ -50,21 +50,21 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
               subscribers.foreach(_ ! job)
               context.become(running(newState, subscribers))
             case None =>
-              val errMsg = "Cannot resolve record source: " + name
-              val err = Error(Error.SOURCE_NOT_FOUND, errMsg)
+              val errMsg = "Cannot resolve runner: " + name
+              val err = Error(Error.NOT_FOUND, errMsg)
               subscribers.foreach(_ ! err)
           }
       }
     case Stop(id) =>
       state.procs.get(id) match {
-        case Some(_) =>
-          val errMsg = "Stopping record channel not implemented: " + id
-          val err = Error(Error.NOT_IMPLEMENTED, errMsg)
-          logger.warn(errMsg)
-          subscribers.foreach(_ ! err)
+        case Some(proc) =>
+          logger.info("Stopping process: " + proc)
+          system.stop(proc.runner)
+          // removing the proc from monitoring to
+          context.become(running(state.copy(procs = state.procs - id), subscribers))
         case None =>
-          val errMsg = "Channel not found: " + id
-          val err = Error(Error.SOURCE_NOT_FOUND, errMsg)
+          val errMsg = "Process not found: " + id
+          val err = Error(Error.NOT_FOUND, errMsg)
           logger.warn(errMsg)
           subscribers.foreach(_ ! err)
       }
@@ -102,7 +102,6 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
               } else {
                 context.system.scheduler.scheduleOnce(minRestartDelay, self, Restart(newJob))
               }
-            // todo restart
             case None =>
               logger.warn("Unmonitored actor terminated: " + actorName + "; doing nothing.")
           }
