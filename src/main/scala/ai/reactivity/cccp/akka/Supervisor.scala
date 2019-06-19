@@ -45,7 +45,7 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
               context.watch(runner)
               val job = Job.createNew(nextPid, name, params)
               val proc = Process(job, runner)
-              val newState = state.copy(procs = state.procs + (job.id -> proc))
+              val newState = state.copy(procs = state.procs + (job.pid -> proc))
               logger.info("Created job: " + job)
               subscribers.foreach(_ ! job)
               context.become(running(newState, subscribers))
@@ -71,13 +71,13 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
     case Restart(job) =>
       resolver.resolve(job) match {
         case Some(props) =>
-          val actorName = "proc-" + job.name + "-" + job.id // reusing same pid
+          val actorName = "proc-" + job.name + "-" + job.pid // reusing same pid
           logger.info("Restarting: " + job)
           val runner = context.actorOf(props, actorName)
           context.watch(runner)
           val newJob = job.copy(updated = Instant.now(), status = JobStatus.Running)
           val newProc = Process(newJob, runner)
-          val newState = state.copy(procs = state.procs + (newProc.job.id -> newProc))
+          val newState = state.copy(procs = state.procs + (newProc.job.pid -> newProc))
           context.become(running(newState, subscribers))
         case None =>
           logger.error("Could not resolve runner for $job!")
@@ -94,7 +94,7 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
               logger.info(s"Monitored proc found: $pid. Proceeding to restart...")
               val newJob = proc.job.copy(updated = Instant.now(), status = JobStatus.Restarting)
               val newProc = proc.copy(job = newJob)
-              val newState = state.copy(procs = state.procs + (newJob.id -> newProc))
+              val newState = state.copy(procs = state.procs + (newJob.pid -> newProc))
               val elapsedTime = (newJob.updated.toEpochMilli - proc.job.updated.toEpochMilli).millis
               context.become(running(newState, subscribers))
               if (elapsedTime > minRestartDelay) {
