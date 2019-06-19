@@ -8,7 +8,6 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage, UpgradeToWebSocket}
-import akka.pattern.pipe
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.scalalogging.LazyLogging
@@ -20,6 +19,7 @@ import org.json4s.{Formats, NoTypeHints}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
 
 class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Actor with LazyLogging {
 
@@ -38,9 +38,14 @@ class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Act
       case req@HttpRequest(HttpMethods.GET, Uri.Path("/"), _, _, _) =>
         req.header[UpgradeToWebSocket] match {
           case Some(upgrade) =>
-            val session = new WebsocketSession(onRequest = { msg =>
+            val session = new WebsocketSession(onRequest = { (s, msg) =>
               val decoded = decodeRequest(msg)
-              decoded.pipeTo(self)
+              decoded.onComplete {
+                case Success(x) => self ! x
+                case Failure(e) =>
+                  val decodeError = JsonRpcResponse.error(-500,"Request decode error: " + e.getMessage)
+                  sendTo(session, decodeError)
+              }
             }, onDisconnect = self ! Disconnected(_))
             self ! Connected(session)
             upgrade.handleMessages(session.flow)
@@ -109,6 +114,12 @@ class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Act
     val jsonRpcResponse = JsonRpcResponse.result(response)
     val encoded = write(jsonRpcResponse)
     TextMessage.Strict(text = encoded)
+  }
+
+  private def sendTo(session: WebsocketSession, response: AnyRef): Unit = {
+    val encoded = write(response)
+    val msg = TextMessage.Strict(text = encoded)
+    session.send(msg)
   }
 }
 

@@ -38,7 +38,7 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
         case None =>
           resolver.resolve(name, params) match {
             case Some(props) =>
-              logger.info("Resolved runner: " + name)
+              logger.info("Resolved service: " + name)
               val nextPid = state.nextPid
               val actorName = "proc-" + name + "-" + nextPid
               val runner = context.actorOf(props, actorName)
@@ -50,7 +50,7 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
               subscribers.foreach(_ ! job)
               context.become(running(newState, subscribers))
             case None =>
-              val errMsg = "Cannot resolve runner: " + name
+              val errMsg = "Cannot resolve service: " + name
               val err = Error(Error.NOT_FOUND, errMsg)
               subscribers.foreach(_ ! err)
           }
