@@ -3,7 +3,7 @@ package ai.reactivity.cccp.akka
 import java.time.Instant
 
 import ai.reactivity.cccp.akka.messages.in._
-import ai.reactivity.cccp.akka.messages.out.{Error, Job, JobStatus}
+import ai.reactivity.cccp.akka.messages.out.{Error, Job, JobStatus, Report}
 import ai.reactivity.cccp.akka.state.{MonitorState, Process}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
@@ -82,6 +82,8 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
         case None =>
           logger.error("Could not resolve runner for $job!")
       }
+    case report: Report =>
+      subscribers.foreach(_ ! report)
     case Terminated(actor) =>
       val actorName = actor.path.name
       logger.info("Actor terminated: " + actorName)
@@ -91,7 +93,7 @@ class Supervisor(resolver: Resolver, minRestartDelay: FiniteDuration) extends Ac
           val pid = gr.toInt
           state.procs.get(pid) match {
             case Some(proc) =>
-              logger.info(s"Monitored proc found: $pid. Proceeding to restart...")
+              logger.info(s"Monitored process found: $pid. Proceeding to restart...")
               val newJob = proc.job.copy(updated = Instant.now(), status = JobStatus.Restarting)
               val newProc = proc.copy(job = newJob)
               val newState = state.copy(procs = state.procs + (newJob.pid -> newProc))

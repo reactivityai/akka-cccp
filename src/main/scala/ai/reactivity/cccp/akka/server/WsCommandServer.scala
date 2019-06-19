@@ -44,7 +44,7 @@ class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Act
                 case Success(x) => self ! x
                 case Failure(e) =>
                   val decodeError = JsonRpcResponse.error(-500,"Request decode error: " + e.getMessage)
-                  sendTo(session, decodeError)
+                  sendTo(s, decodeError)
               }
             }, onDisconnect = self ! Disconnected(_))
             self ! Connected(session)

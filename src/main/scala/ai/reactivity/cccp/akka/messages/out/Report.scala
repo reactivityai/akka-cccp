@@ -4,4 +4,4 @@ import java.time.Instant
 
 import org.json4s.JsonAST.JValue
 
-case class Report(data: JValue, timestamp: Instant)
+case class Report(origin: String, data: JValue, timestamp: Instant)
