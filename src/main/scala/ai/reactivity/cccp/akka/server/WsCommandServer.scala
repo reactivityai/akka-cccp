@@ -9,7 +9,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage, UpgradeToWebSocket}
 import akka.stream.scaladsl.Sink
-import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.scalalogging.LazyLogging
 import org.json4s.JsonAST.JValue
 import org.json4s.jackson.JsonMethods._
@@ -26,7 +25,6 @@ class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Act
   implicit val formats: Formats = Serialization.formats(NoTypeHints) ++ JavaTimeSerializers.defaults
 
   implicit val system: ActorSystem = context.system
-  implicit val mat: Materializer = ActorMaterializer()
 
   var bindingFuture: Future[Http.ServerBinding] = _
 
