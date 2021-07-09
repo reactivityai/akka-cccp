@@ -7,7 +7,7 @@ import ai.reactivity.cccp.util.JavaTimeSerializers
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage, UpgradeToWebSocket}
+import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import akka.stream.scaladsl.Sink
 import com.typesafe.scalalogging.LazyLogging
 import org.json4s.JsonAST.JValue
@@ -34,7 +34,7 @@ class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Act
 
     val requestHandler: HttpRequest => HttpResponse = {
       case req@HttpRequest(HttpMethods.GET, Uri.Path("/"), _, _, _) =>
-        req.header[UpgradeToWebSocket] match {
+        req.attribute(AttributeKeys.webSocketUpgrade) match {
           case Some(upgrade) =>
             val session = new WebsocketSession(onRequest = { (s, msg) =>
               val decoded = decodeRequest(msg)
@@ -57,7 +57,7 @@ class WsCommandServer(supervisor: ActorRef, host: String, port: Int) extends Act
 
     supervisor ! Subscribe(self)
 
-    bindingFuture = Http().bindAndHandleSync(requestHandler, interface = host, port = port)
+    bindingFuture = Http().newServerAt(host, port).bindSync(requestHandler)
     logger.info(s"WS server online, $host:$port...")
     context.become(running(subscribers = Set.empty, sessions = Set.empty))
   }
